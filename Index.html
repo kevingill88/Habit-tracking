@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Habits"/>
+<meta name="theme-color" content="#080f08"/>
+<title>Habits</title>
+
+<!-- PWA manifest inline -->
+<script>
+const manifestData = {
+  name: "Habit Tracker",
+  short_name: "Habits",
+  start_url: ".",
+  display: "standalone",
+  background_color: "#080f08",
+  theme_color: "#080f08",
+  icons: [{
+    src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23080f08'/><text y='.9em' font-size='72' x='50%' text-anchor='middle'>🌿</text></svg>",
+    sizes: "192x192", type: "image/svg+xml"
+  }]
+};
+const blob = new Blob([JSON.stringify(manifestData)], {type:"application/json"});
+const manifestURL = URL.createObjectURL(blob);
+document.addEventListener("DOMContentLoaded", () => {
+  const l = document.createElement("link");
+  l.rel = "manifest"; l.href = manifestURL;
+  document.head.appendChild(l);
+});
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #080f08; color: #e8f5e9; font-family: 'DM Sans', system-ui, sans-serif; overscroll-behavior: none; }
+  ::-webkit-scrollbar { display: none; }
+  input, button { font-family: inherit; }
+  input::placeholder { color: #1a3a1a; }
+  input:focus { outline: none; border-color: rgba(74,222,128,0.35) !important; }
+
+  #app {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    display: flex;
+    flex-direction: column;
+    max-width: 430px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  .ambient {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse 90% 40% at 50% -5%, #0d2a10 0%, transparent 68%);
+  }
+
+  /* header */
+  .header {
+    position: relative; z-index: 1;
+    padding: env(safe-area-inset-top, 48px) 22px 14px;
+    padding-top: max(env(safe-area-inset-top), 48px);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-date { font-size: 11px; letter-spacing: 3px; color: #2a4a2a; text-transform: uppercase; margin-bottom: 4px; }
+  .header-title {
+    font-size: 30px; font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(135deg, #e8f5e9 0%, #4ade80 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .add-btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #16a34a, #4ade80);
+    border: none; color: #071407; font-size: 24px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 22px #4ade8055;
+  }
+
+  /* tabs */
+  .tabs { position: relative; z-index: 1; display: flex; gap: 6px; padding: 0 22px 18px; }
+  .tab-btn {
+    flex: 1; padding: 10px 0; border-radius: 12px; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.3px; transition: all .2s;
+  }
+  .tab-btn.active {
+    background: linear-gradient(135deg, #15803d, #4ade80);
+    color: #071407; box-shadow: 0 4px 20px #4ade8040;
+  }
+  .tab-btn.inactive { background: rgba(255,255,255,0.04); color: #2a4a2a; }
+
+  /* week view */
+  #week-view { position: relative; z-index: 1; flex: 1; padding: 0 14px; overflow-y: auto; }
+  .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 0 6px; }
+  .nav-btn {
+    width: 32px; height: 32px; border-radius: 10px;
+    border: 1px solid rgba(74,222,128,0.12);
+    background: rgba(74,222,128,0.05); color: #86efac;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .nav-btn:disabled { opacity: 0.25; cursor: default; }
+  .week-label { font-size: 14px; font-weight: 600; color: #86efac; }
+
+  .day-headers { display: grid; grid-template-columns: 60px repeat(7,1fr); gap: 3px; margin-bottom: 8px; padding: 0 2px; }
+  .day-head { text-align: center; }
+  .day-name { font-size: 9px; color: #2a4a2a; margin-bottom: 3px; letter-spacing: 1px; text-transform: uppercase; }
+  .day-num {
+    width: 24px; height: 24px; border-radius: 50%; margin: 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #86efac;
+  }
+  .day-num.today {
+    background: linear-gradient(135deg, #15803d, #4ade80);
+    color: #071407; box-shadow: 0 2px 10px #4ade8055;
+  }
+
+  .habit-rows { display: flex; flex-direction: column; gap: 5px; padding-bottom: 100px; }
+  .habit-row {
+    background: rgba(74,222,128,0.03); border-radius: 13px; padding: 8px 4px 8px 6px;
+    border: 1px solid rgba(74,222,128,0.07);
+  }
+  .habit-grid { display: grid; grid-template-columns: 60px repeat(7,1fr); gap: 3px; align-items: center; }
+  .habit-label { background: none; border: none; cursor: pointer; text-align: left; padding: 0 4px; }
+  .habit-emoji { font-size: 18px; line-height: 1; }
+  .habit-name { font-size: 10px; color: #86efac; font-weight: 700; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 54px; }
+  .habit-week-total { font-size: 9px; color: #2a4a2a; margin-top: 1px; }
+
+  /* counter cell */
+  .counter-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .counter-cell.future { opacity: 0.22; pointer-events: none; }
+  .cnt-plus, .cnt-minus {
+    width: 28px; height: 22px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; transition: all .12s;
+  }
+  .cnt-plus { border-radius: 8px 8px 4px 4px; }
+  .cnt-minus { border-radius: 4px 4px 8px 8px; font-size: 16px; }
+  .cnt-minus:disabled { cursor: default; }
+  .cnt-val {
+    width: 28px; height: 24px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; transition: all .15s;
+  }
+  .cnt-val.zero { background: rgba(255,255,255,0.04); border: 1px solid rgba(74,222,128,0.1); color: #2a4a2a; }
+  .cnt-val.active { color: #071407; }
+
+  /* stats view */
+  #stats-view { position: relative; z-index: 1; flex: 1; padding: 0 22px 100px; overflow-y: auto; }
+  .stat-card {
+    background: rgba(74,222,128,0.04); border: 1px solid rgba(74,222,128,0.09);
+    border-radius: 18px; padding: 18px; margin-bottom: 14px;
+  }
+  .stat-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .stat-icon {
+    width: 44px; height: 44px; border-radius: 13px;
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .stat-name { font-weight: 700; font-size: 16px; }
+  .stat-sub { font-size: 11px; color: #2a4a2a; }
+  .stat-pct { margin-left: auto; font-size: 24px; font-weight: 800; }
+  .stat-pct span { font-size: 13px; font-weight: 400; color: #2a4a2a; }
+  .stat-bar-bg { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.05); margin-bottom: 14px; overflow: hidden; }
+  .stat-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .stat-pills { display: flex; gap: 8px; }
+  .stat-pill { flex: 1; background: rgba(255,255,255,0.03); border-radius: 12px; padding: 10px 4px; text-align: center; }
+  .pill-icon { font-size: 14px; }
+  .pill-val { font-size: 17px; font-weight: 800; margin-top: 2px; }
+  .pill-label { font-size: 9px; color: #2a4a2a; letter-spacing: 0.5px; margin-top: 2px; text-transform: uppercase; }
+
+  /* sheet overlay */
+  .sheet-overlay {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(0,0,0,0.78); backdrop-filter: blur(14px);
+    display: flex; align-items: flex-end;
+  }
+  .sheet {
+    width: 100%; max-width: 430px; margin: 0 auto;
+    background: #0b170b; border-radius: 26px 26px 0 0;
+    padding: 28px 24px;
+    padding-bottom: max(52px, calc(env(safe-area-inset-bottom) + 28px));
+    border: 1px solid rgba(74,222,128,0.14);
+    box-shadow: 0 -10px 50px rgba(74,222,128,0.07);
+  }
+  .sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: #1a2e1a; margin: 0 auto 22px; }
+  .sheet-title { font-size: 18px; font-weight: 700; margin-bottom: 22px; color: #e8f5e9; }
+  .sheet-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .field-label { font-size: 11px; color: #2a4a2a; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .sheet-input {
+    background: rgba(74,222,128,0.07); border: 1px solid rgba(74,222,128,0.15);
+    border-radius: 12px; padding: 12px 14px; color: #e8f5e9; font-size: 15px; display: block; width: 100%;
+  }
+  .emoji-input { width: 58px; font-size: 24px; text-align: center; }
+  .color-row { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 10px; }
+  .color-swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; transition: all .15s; }
+  .sheet-btns { display: flex; gap: 10px; margin-top: 26px; }
+  .ghost-btn {
+    padding: 14px 0; border-radius: 14px; font-size: 15px; font-weight: 600;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
+    color: #86efac; cursor: pointer; flex: 1;
+  }
+  .del-btn {
+    padding: 14px 16px; border-radius: 14px; font-size: 13px; font-weight: 600;
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
+    color: #f87171; cursor: pointer; white-space: nowrap;
+  }
+  .del-btn.confirm { background: rgba(239,68,68,0.25); border-color: rgba(239,68,68,0.4); }
+  .save-btn {
+    flex: 2; padding: 14px 0; border-radius: 14px; font-size: 15px; font-weight: 700;
+    border: none; cursor: pointer; color: #071407;
+  }
+  .empty-msg { text-align: center; color: #1a3a1a; font-size: 14px; padding: 50px 0; }
+
+  /* bottom nav */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 430px; z-index: 10;
+    background: rgba(8,15,8,0.9); backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(74,222,128,0.07);
+    padding: 12px 40px;
+    padding-bottom: max(28px, calc(env(safe-area-inset-bottom) + 12px));
+    display: flex; justify-content: space-around;
+  }
+  .nav-tab { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: opacity .2s; }
+  .nav-tab.active { opacity: 1; }
+  .nav-tab.inactive { opacity: 0.3; }
+  .nav-tab-icon { font-size: 22px; }
+  .nav-tab-label { font-size: 10px; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+<div id="app">
+  <div class="header">
+    <div>
+      <div class="header-date" id="header-date"></div>
+      <div class="header-title">Habits</div>
+    </div>
+    <button class="add-btn" id="add-btn" onclick="openSheet(null)">+</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-week" onclick="setTab('week')">📅&nbsp; Week</button>
+    <button class="tab-btn inactive" id="tab-stats" onclick="setTab('stats')">📊&nbsp; Stats</button>
+  </div>
+
+  <div id="week-view">
+    <div class="week-nav">
+      <button class="nav-btn" id="prev-week" onclick="changeWeek(-1)">‹</button>
+      <span class="week-label" id="week-label"></span>
+      <button class="nav-btn" id="next-week" onclick="changeWeek(1)">›</button>
+    </div>
+    <div class="day-headers" id="day-headers"></div>
+    <div class="habit-rows" id="habit-rows"></div>
+  </div>
+
+  <div id="stats-view" style="display:none"></div>
+
+  <div class="bottom-nav">
+    <button class="nav-tab active" id="nav-week" onclick="setTab('week')">
+      <span class="nav-tab-icon">📅</span>
+      <span class="nav-tab-label" style="color:#4ade80">Week</span>
+    </button>
+    <button class="nav-tab inactive" id="nav-stats" onclick="setTab('stats')">
+      <span class="nav-tab-icon">📊</span>
+      <span class="nav-tab-label" style="color:#2a4a2a">Stats</span>
+    </button>
+  </div>
+</div>
+
+<!-- Sheet overlay -->
+<div class="sheet-overlay" id="sheet-overlay" style="display:none" onclick="closeSheet(event)">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheet-title">New Habit</div>
+    <div class="sheet-row">
+      <div>
+        <div class="field-label">Icon</div>
+        <input class="sheet-input emoji-input" id="sheet-emoji" maxlength="2" value="✨"/>
+      </div>
+      <div style="flex:1">
+        <div class="field-label">Name</div>
+        <input class="sheet-input" id="sheet-name" placeholder="e.g. Morning Run"/>
+      </div>
+    </div>
+    <div>
+      <div class="field-label">Color</div>
+      <div class="color-row" id="color-row"></div>
+    </div>
+    <div class="sheet-btns" id="sheet-btns"></div>
+  </div>
+</div>
+
+<script>
+// ── constants ─────────────────────────────────────────────────────────────────
+const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const PALETTE = ["#4ade80","#34d399","#86efac","#6ee7b7","#a3e635","#facc15","#fb923c","#f87171","#60a5fa","#e879f9"];
+const DEFAULT_HABITS = [
+  {id:"h1",name:"Exercise",emoji:"🏃",color:"#4ade80"},
+  {id:"h2",name:"Meditate",emoji:"🧘",color:"#34d399"},
+  {id:"h3",name:"Read",    emoji:"📖",color:"#86efac"},
+  {id:"h4",name:"Water",   emoji:"💧",color:"#6ee7b7"},
+];
+
+// ── state ─────────────────────────────────────────────────────────────────────
+let habits     = load("ht_habits", DEFAULT_HABITS);
+let logs       = load("ht_logs",   {});
+let weekOffset = 0;
+let currentTab = "week";
+let sheetHabitId = null;   // null = add, string = edit
+let sheetColor   = PALETTE[0];
+let confirmDel   = false;
+
+// ── storage ───────────────────────────────────────────────────────────────────
+function load(key, fb) { try { const v=localStorage.getItem(key); return v?JSON.parse(v):fb; } catch { return fb; } }
+function persist() {
+  try { localStorage.setItem("ht_habits", JSON.stringify(habits)); } catch {}
+  try { localStorage.setItem("ht_logs",   JSON.stringify(logs));   } catch {}
+}
+
+// ── date helpers ──────────────────────────────────────────────────────────────
+function today() { const d=new Date(); d.setHours(0,0,0,0); return d; }
+function fmt(d)  { return d.toISOString().slice(0,10); }
+function addDays(d,n) { const c=new Date(d); c.setDate(c.getDate()+n); return c; }
+function startOfWeek(d) { const c=new Date(d); c.setHours(0,0,0,0); c.setDate(c.getDate()-c.getDay()); return c; }
+function weekStart() { return startOfWeek(addDays(today(), weekOffset*7)); }
+function weekDays()  { return Array.from({length:7},(_,i)=>addDays(weekStart(),i)); }
+
+// ── stats ─────────────────────────────────────────────────────────────────────
+function calcStreak(id) {
+  const todayStr = fmt(today());
+  const check = d => ((logs[fmt(d)]||{})[id]||0) > 0;
+  let streak=0, d=today();
+  while (check(d)) { streak++; d=addDays(d,-1); }
+  const allDates = Object.keys(logs).sort();
+  if (!allDates.length) return {current:streak, best:streak};
+  let best=0, temp=0, scan=new Date(allDates[0]);
+  while (fmt(scan)<=todayStr) {
+    if (check(scan)) { temp++; if(temp>best) best=temp; } else temp=0;
+    scan=addDays(scan,1);
+  }
+  return {current:streak, best};
+}
+function countRange(id, from, to) {
+  let total=0, d=new Date(from);
+  const toStr=fmt(to);
+  while (fmt(d)<=toStr) { total+=(logs[fmt(d)]||{})[id]||0; d=addDays(d,1); }
+  return total;
+}
+
+// ── tab ───────────────────────────────────────────────────────────────────────
+function setTab(tab) {
+  currentTab = tab;
+  document.getElementById("week-view").style.display  = tab==="week"  ? "" : "none";
+  document.getElementById("stats-view").style.display = tab==="stats" ? "" : "none";
+  document.getElementById("add-btn").style.display    = tab==="week"  ? "" : "none";
+  document.getElementById("tab-week").className  = "tab-btn " + (tab==="week"  ? "active" : "inactive");
+  document.getElementById("tab-stats").className = "tab-btn " + (tab==="stats" ? "active" : "inactive");
+  document.getElementById("nav-week").className  = "nav-tab " + (tab==="week"  ? "active" : "inactive");
+  document.getElementById("nav-stats").className = "nav-tab " + (tab==="stats" ? "active" : "inactive");
+  document.querySelector("#nav-week  .nav-tab-label").style.color  = tab==="week"  ? "#4ade80" : "#2a4a2a";
+  document.querySelector("#nav-stats .nav-tab-label").style.color  = tab==="stats" ? "#4ade80" : "#2a4a2a";
+  if (tab==="stats") renderStats();
+}
+
+// ── week nav ──────────────────────────────────────────────────────────────────
+function changeWeek(delta) {
+  weekOffset = Math.min(0, weekOffset + delta);
+  renderWeek();
+}
+
+function weekLabel() {
+  const ws = weekStart();
+  const e  = addDays(ws, 6);
+  if (weekOffset===0)  return "This Week";
+  if (weekOffset===-1) return "Last Week";
+  return `${MONTHS[ws.getMonth()]} ${ws.getDate()} – ${MONTHS[e.getMonth()]} ${e.getDate()}`;
+}
+
+// ── adjust counter ────────────────────────────────────────────────────────────
+function adjust(habitId, dateStr, delta) {
+  if (!logs[dateStr]) logs[dateStr] = {};
+  logs[dateStr][habitId] = Math.max(0, (logs[dateStr][habitId]||0) + delta);
+  persist();
+  renderWeek();
+}
+
+// ── render week ───────────────────────────────────────────────────────────────
+function renderWeek() {
+  const todayStr = fmt(today());
+  const days = weekDays();
+
+  document.getElementById("week-label").textContent = weekLabel();
+  document.getElementById("next-week").disabled = weekOffset === 0;
+
+  // day headers
+  const dh = document.getElementById("day-headers");
+  dh.innerHTML = "<div></div>" + days.map((d,i) => {
+    const isToday = fmt(d)===todayStr;
+    return `<div class="day-head">
+      <div class="day-name">${DAYS[i]}</div>
+      <div class="day-num${isToday?" today":""}">${d.getDate()}</div>
+    </div>`;
+  }).join("");
+
+  // habit rows
+  const hr = document.getElementById("habit-rows");
+  if (!habits.length) { hr.innerHTML = '<div class="empty-msg">Tap + to add your first habit</div>'; return; }
+
+  hr.innerHTML = habits.map(h => {
+    const color = h.color||PALETTE[0];
+    const weekTotal = days.reduce((s,d)=>s+((logs[fmt(d)]||{})[h.id]||0),0);
+    const cells = days.map((d,i) => {
+      const ds = fmt(d);
+      const isFuture = d > today();
+      const val = (logs[ds]||{})[h.id]||0;
+      const active = val > 0;
+      const plusBg  = active ? color+"28" : "rgba(255,255,255,0.05)";
+      const plusCol = active ? color       : "#2a4a2a";
+      const valBg   = active ? color       : "rgba(255,255,255,0.04)";
+      const valCol  = active ? "#071407"   : "#2a4a2a";
+      const valBorder = active ? "none" : "1px solid rgba(74,222,128,0.1)";
+      const valShadow = active ? `0 0 12px ${color}55` : "none";
+      const minusBg  = val>0 ? "rgba(255,255,255,0.06)" : "transparent";
+      const minusCol = val>0 ? "#4a7a4a" : "#1a2e1a";
+      return `<div class="counter-cell${isFuture?" future":""}">
+        <button class="cnt-plus" style="background:${plusBg};color:${plusCol}" onclick="adjust('${h.id}','${ds}',1)">+</button>
+        <div class="cnt-val${active?" active":" zero"}" style="background:${valBg};color:${valCol};border:${valBorder};box-shadow:${valShadow}">${val}</div>
+        <button class="cnt-minus" style="background:${minusBg};color:${minusCol}" ${val===0?"disabled":""} onclick="adjust('${h.id}','${ds}',-1)">−</button>
+      </div>`;
+    }).join("");
+    return `<div class="habit-row">
+      <div class="habit-grid">
+        <button class="habit-label" onclick="openSheet('${h.id}')">
+          <div class="habit-emoji">${h.emoji}</div>
+          <div class="habit-name">${h.name}</div>
+          <div class="habit-week-total">×${weekTotal} wk</div>
+        </button>
+        ${cells}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ── render stats ──────────────────────────────────────────────────────────────
+function renderStats() {
+  const now       = today();
+  const yearStart = new Date(now.getFullYear(),0,1);
+  const thirtyAgo = addDays(now,-29);
+  const sv = document.getElementById("stats-view");
+
+  if (!habits.length) { sv.innerHTML = '<div class="empty-msg">No habits yet!</div>'; return; }
+
+  sv.innerHTML = habits.map(h => {
+    const color     = h.color||PALETTE[0];
+    const total30   = countRange(h.id, thirtyAgo, now);
+    const totalYear = countRange(h.id, yearStart, now);
+    const {current,best} = calcStreak(h.id);
+    const pct = Math.min(100, Math.round((total30/30)*100));
+    const pills = [
+      {label:"This Year", val:totalYear,    icon:"📆"},
+      {label:"Last 30d",  val:total30,      icon:"🗓"},
+      {label:"Streak",    val:current+"d",  icon:"🔥"},
+      {label:"Best",      val:best+"d",     icon:"🏆"},
+    ].map(p=>`<div class="stat-pill">
+      <div class="pill-icon">${p.icon}</div>
+      <div class="pill-val" style="color:${color}">${p.val}</div>
+      <div class="pill-label">${p.label}</div>
+    </div>`).join("");
+    return `<div class="stat-card">
+      <div class="stat-card-header">
+        <div class="stat-icon" style="background:${color}1a;border:1.5px solid ${color}44">${h.emoji}</div>
+        <div>
+          <div class="stat-name">${h.name}</div>
+          <div class="stat-sub">Last 30 days — ${total30} total</div>
+        </div>
+        <div class="stat-pct" style="color:${color}">${pct}<span>%</span></div>
+      </div>
+      <div class="stat-bar-bg">
+        <div class="stat-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${color},${color}77)"></div>
+      </div>
+      <div class="stat-pills">${pills}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── sheet ─────────────────────────────────────────────────────────────────────
+function openSheet(habitId) {
+  sheetHabitId = habitId;
+  confirmDel   = false;
+  const h = habitId ? habits.find(x=>x.id===habitId) : null;
+  sheetColor = h ? h.color : PALETTE[0];
+
+  document.getElementById("sheet-title").textContent = h ? "Edit Habit" : "New Habit";
+  document.getElementById("sheet-emoji").value = h ? h.emoji : "✨";
+  document.getElementById("sheet-name").value  = h ? h.name  : "";
+
+  // color swatches
+  renderSwatches();
+
+  // buttons
+  renderSheetBtns();
+
+  document.getElementById("sheet-overlay").style.display = "flex";
+  setTimeout(()=>document.getElementById("sheet-name").focus(), 100);
+}
+
+function renderSwatches() {
+  document.getElementById("color-row").innerHTML = PALETTE.map(c => {
+    const selected = c === sheetColor;
+    return `<button class="color-swatch" style="background:${c};border:3px solid ${selected?"#fff":"transparent"};box-shadow:${selected?`0 0 12px ${c}`:"none"}" onclick="pickColor('${c}')"></button>`;
+  }).join("");
+}
+
+function renderSheetBtns() {
+  const btns = document.getElementById("sheet-btns");
+  const delPart = sheetHabitId
+    ? `<button class="del-btn${confirmDel?" confirm":""}" onclick="handleDelete()">${confirmDel?"Confirm?":"Delete"}</button>`
+    : "";
+  btns.innerHTML = `${delPart}
+    <button class="ghost-btn" onclick="closeSheet()">Cancel</button>
+    <button class="save-btn" style="background:linear-gradient(135deg,${sheetColor},${sheetColor}99);box-shadow:0 4px 20px ${sheetColor}44" onclick="saveHabit()">
+      ${sheetHabitId?"Save Changes":"Add Habit"}
+    </button>`;
+}
+
+function pickColor(c) { sheetColor = c; renderSwatches(); renderSheetBtns(); }
+
+function handleDelete() {
+  if (!confirmDel) { confirmDel = true; renderSheetBtns(); return; }
+  habits = habits.filter(x=>x.id!==sheetHabitId);
+  persist();
+  closeSheet();
+  renderWeek();
+}
+
+function saveHabit() {
+  const name  = document.getElementById("sheet-name").value.trim();
+  const emoji = document.getElementById("sheet-emoji").value.trim() || "✨";
+  if (!name) { document.getElementById("sheet-name").focus(); return; }
+  if (sheetHabitId) {
+    habits = habits.map(x => x.id===sheetHabitId ? {...x, name, emoji, color:sheetColor} : x);
+  } else {
+    habits.push({id:"h"+Date.now(), name, emoji, color:sheetColor});
+  }
+  persist();
+  closeSheet();
+  renderWeek();
+}
+
+function closeSheet(event) {
+  if (event && event.target !== document.getElementById("sheet-overlay")) return;
+  document.getElementById("sheet-overlay").style.display = "none";
+}
+
+// ── init ──────────────────────────────────────────────────────────────────────
+document.getElementById("header-date").textContent =
+  new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+
+renderWeek();
+
+// service worker for offline support
+if ("serviceWorker" in navigator) {
+  const swCode = `
+    const CACHE = "habits-v1";
+    self.addEventListener("install", e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(["."])));
+    });
+    self.addEventListener("fetch", e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const swBlob = new Blob([swCode], {type:"text/javascript"});
+  const swURL  = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swURL).catch(()=>{});
+}
+</script>
+</body>
+</html>
